@@ -39,20 +39,24 @@ async def chat(request: ChatRequest):
         
         # Create an async generator function for streaming responses
         async def generate():
-            # Create a streaming chat completion request
-            stream = client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {"role": "developer", "content": request.developer_message},
-                    {"role": "user", "content": request.user_message}
-                ],
-                stream=True  # Enable streaming response
-            )
-            
-            # Yield each chunk of the response as it becomes available
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
+            try:
+                # Create a streaming chat completion request
+                stream = client.chat.completions.create(
+                    model=request.model,
+                    messages=[
+                        {"role": "system", "content": request.developer_message},
+                        {"role": "user", "content": request.user_message}
+                    ],
+                    stream=True  # Enable streaming response
+                )
+                
+                # Yield each chunk of the response as it becomes available
+                for chunk in stream:
+                    if chunk.choices[0].delta.content is not None:
+                        yield chunk.choices[0].delta.content
+            except Exception as e:
+                # Yield error message as part of the stream
+                yield f"Error: {str(e)}"
 
         # Return a streaming response to the client
         return StreamingResponse(generate(), media_type="text/plain")
