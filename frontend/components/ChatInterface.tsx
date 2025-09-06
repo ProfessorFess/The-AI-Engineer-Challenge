@@ -25,7 +25,7 @@ export default function ChatInterface({
   const [showApiKeyModal, setShowApiKeyModal] = useState(!isConfigured)
   const [apiKey, setApiKey] = useState('')
   const [developerMessage, setDeveloperMessage] = useState('You are a helpful AI assistant.')
-  const [model, setModel] = useState('gpt-4.1-mini')
+  const [model, setModel] = useState('gpt-4o-mini')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -68,7 +68,9 @@ export default function ChatInterface({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response')
+        const errorText = await response.text()
+        console.error('API Error:', response.status, errorText)
+        throw new Error(`API Error: ${response.status} - ${errorText}`)
       }
 
       const reader = response.body?.getReader()
@@ -100,7 +102,7 @@ export default function ChatInterface({
       console.error('Error:', error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'Sorry, there was an error processing your request. Please check your API key and try again.',
+        content: `Sorry, there was an error processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your API key and try again.`,
         role: 'assistant',
         timestamp: new Date()
       }
