@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Key, Settings } from 'lucide-react'
+import { Send, Bot, User, Key, Settings, MessageCircle } from 'lucide-react'
 import MessageBubble from './MessageBubble'
 import ApiKeyModal from './ApiKeyModal'
 
