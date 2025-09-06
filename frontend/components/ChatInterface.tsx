@@ -73,31 +73,16 @@ export default function ChatInterface({
         throw new Error(`API Error: ${response.status} - ${errorText}`)
       }
 
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response body')
-
+      const data = await response.json()
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: '',
+        content: data.content || 'No response received',
         role: 'assistant',
         timestamp: new Date()
       }
 
       setMessages(prev => [...prev, assistantMessage])
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = new TextDecoder().decode(value)
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === assistantMessage.id 
-              ? { ...msg, content: msg.content + chunk }
-              : msg
-          )
-        )
-      }
     } catch (error) {
       console.error('Error:', error)
       const errorMessage: Message = {

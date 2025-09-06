@@ -37,29 +37,18 @@ async def chat(request: ChatRequest):
         # Initialize OpenAI client with the provided API key
         client = OpenAI(api_key=request.api_key)
         
-        # Create an async generator function for streaming responses
-        async def generate():
-            try:
-                # Create a streaming chat completion request
-                stream = client.chat.completions.create(
-                    model=request.model,
-                    messages=[
-                        {"role": "system", "content": request.developer_message},
-                        {"role": "user", "content": request.user_message}
-                    ],
-                    stream=True  # Enable streaming response
-                )
-                
-                # Yield each chunk of the response as it becomes available
-                for chunk in stream:
-                    if chunk.choices[0].delta.content is not None:
-                        yield chunk.choices[0].delta.content
-            except Exception as e:
-                # Yield error message as part of the stream
-                yield f"Error: {str(e)}"
-
-        # Return a streaming response to the client
-        return StreamingResponse(generate(), media_type="text/plain")
+        # Create a non-streaming response first to test
+        response = client.chat.completions.create(
+            model=request.model,
+            messages=[
+                {"role": "system", "content": request.developer_message},
+                {"role": "user", "content": request.user_message}
+            ],
+            stream=False  # Disable streaming for now
+        )
+        
+        # Return the response content
+        return {"content": response.choices[0].message.content}
     
     except Exception as e:
         # Handle any errors that occur during processing
