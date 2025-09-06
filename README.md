@@ -14,7 +14,46 @@
 
 In this repository, we'll walk you through the steps to create a LLM (Large Language Model) powered application with a vibe-coded frontend!
 
+## 🎉 What You'll Build
+
+A beautiful, earth-toned chat interface that connects to OpenAI's API! Think of it as your very own ChatGPT clone, but with a cozy, natural aesthetic that's easy on the eyes. 🌿✨
+
+**Features you'll get:**
+- 🎨 Stunning earth-tone design (browns, greens, tans)
+- 💬 Real-time chat with AI
+- 🔐 Secure API key management
+- ⚙️ Customizable AI behavior
+- 📱 Works on desktop and mobile
+- 🚀 Ready to deploy to Vercel
+
 Are you ready? Let's get started!
+
+## ⚡ Quick Start (Already Built!)
+
+**Good news!** This project already has a beautiful frontend built! Here's how to run it:
+
+### 1. Start the Backend 🚀
+```bash
+cd api
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
+
+### 2. Start the Frontend 🎨
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 3. Open Your Browser 🌐
+Go to `http://localhost:3000` and enter your OpenAI API key!
+
+**Need an API key?** Get one at [OpenAI Platform](https://platform.openai.com/api-keys) (you'll need to add billing info)
+
+---
 
 <details>
   <summary>🖥️ Accessing "gpt-4.1-mini" (ChatGPT) like a developer</summary>

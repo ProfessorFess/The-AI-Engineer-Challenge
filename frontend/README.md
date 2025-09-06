@@ -117,13 +117,32 @@ Add new OpenAI models in the `ApiKeyModal.tsx` component:
    - Ensure the FastAPI backend is running on port 8000
    - Check that CORS is properly configured
 
-2. **API Key Issues**
-   - Verify your OpenAI API key is valid
-   - Ensure you have sufficient credits in your OpenAI account
+2. **API Key Issues** 🔑
+   - **Invalid API Key**: Verify your OpenAI API key is valid (starts with `sk-`)
+   - **Insufficient Quota**: You've exceeded your OpenAI billing limit
+     - Check your usage at [OpenAI Platform](https://platform.openai.com/usage)
+     - Add payment method or upgrade your plan
+     - Wait for billing cycle reset if on free tier
+   - **Rate Limits**: You're hitting OpenAI's rate limits
+     - Wait a moment and try again
+     - Consider upgrading to a higher tier plan
 
-3. **Build Errors**
+3. **Backend Not Starting** 🚀
+   - Make sure you're in the `api` directory
+   - Activate the virtual environment: `source venv/bin/activate`
+   - Install dependencies: `pip install -r requirements.txt`
+   - Start the server: `python app.py`
+
+4. **Build Errors**
    - Run `npm install` to ensure all dependencies are installed
    - Check that you're using Node.js 18+
+
+### Error Messages Explained
+
+- **"You exceeded your current quota"** = Your OpenAI account needs billing setup
+- **"Incorrect API key provided"** = Your API key is invalid or expired
+- **"Rate limit exceeded"** = You're making too many requests too quickly
+- **"ERR_INCOMPLETE_CHUNKED_ENCODING"** = Backend not running or connection issue
 
 ## Deployment
 
