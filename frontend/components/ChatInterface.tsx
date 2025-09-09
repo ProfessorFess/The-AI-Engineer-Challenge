@@ -25,7 +25,7 @@ export default function ChatInterface({
   const [showApiKeyModal, setShowApiKeyModal] = useState(!isConfigured)
   const [apiKey, setApiKey] = useState('')
   const [developerMessage, setDeveloperMessage] = useState('You are a helpful AI assistant.')
-  const [model, setModel] = useState('gpt-4o-mini')
+  const [model, setModel] = useState('gpt-4.1-mini')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -54,7 +54,7 @@ export default function ChatInterface({
     setIsLoading(true)
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
