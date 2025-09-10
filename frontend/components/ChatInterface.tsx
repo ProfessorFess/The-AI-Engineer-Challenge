@@ -54,16 +54,18 @@ export default function ChatInterface({
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          developer_message: developerMessage,
-          user_message: input.trim(),
           model: model,
-          api_key: apiKey
+          messages: [
+            { role: 'system', content: developerMessage },
+            { role: 'user', content: input.trim() }
+          ]
         })
       })
 
@@ -77,7 +79,7 @@ export default function ChatInterface({
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.content || 'No response received',
+        content: data.choices[0]?.message?.content || 'No response received',
         role: 'assistant',
         timestamp: new Date()
       }
