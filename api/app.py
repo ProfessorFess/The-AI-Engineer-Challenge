@@ -67,10 +67,14 @@ class CustomEmbeddingModel:
         # For simplicity, use sync version (could be optimized with AsyncOpenAI)
         return self.get_embeddings(list_of_text)
 
-# Global RAG components
+# Global RAG components (Note: These won't persist in Vercel serverless environment)
 vector_db: Optional[VectorDatabase] = None
 pdf_content: str = ""
 uploaded_filename: str = ""
+
+# For Vercel deployment, we'll need to handle stateless nature
+import json
+from pathlib import Path
 
 # Define the data models for API requests using Pydantic
 # This ensures incoming request data is properly validated
@@ -261,7 +265,14 @@ async def clear_pdf():
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok"}
+    # Detect if running on Vercel
+    is_vercel = os.getenv("VERCEL") is not None
+    
+    return {
+        "status": "ok",
+        "environment": "vercel" if is_vercel else "local",
+        "pdf_rag_limitation": "PDF uploads work but don't persist between requests on Vercel" if is_vercel else None
+    }
 
 # Entry point for running the application directly
 if __name__ == "__main__":
