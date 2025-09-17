@@ -17,7 +17,7 @@ export default function ChatInterface({
   onConfigured 
 }: { 
   isConfigured: boolean
-  onConfigured: () => void 
+  onConfigured: (apiKey: string) => void 
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -54,32 +54,31 @@ export default function ChatInterface({
     setIsLoading(true)
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Use the backend API instead of directly calling OpenAI
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
+          developer_message: developerMessage,
+          user_message: input.trim(),
           model: model,
-          messages: [
-            { role: 'system', content: developerMessage },
-            { role: 'user', content: input.trim() }
-          ]
+          api_key: apiKey
         })
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API Error:', response.status, errorText)
-        throw new Error(`API Error: ${response.status} - ${errorText}`)
+        const errorData = await response.json()
+        console.error('API Error:', response.status, errorData)
+        throw new Error(`API Error: ${response.status} - ${errorData.detail || 'Unknown error'}`)
       }
 
       const data = await response.json()
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.choices[0]?.message?.content || 'No response received',
+        content: data.content || 'No response received',
         role: 'assistant',
         timestamp: new Date()
       }
@@ -102,7 +101,7 @@ export default function ChatInterface({
   const handleApiKeySubmit = (key: string) => {
     setApiKey(key)
     setShowApiKeyModal(false)
-    onConfigured()
+    onConfigured(key)
   }
 
   const adjustTextareaHeight = () => {

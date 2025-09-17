@@ -1,31 +1,115 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ChatInterface from '@/components/ChatInterface'
+import PDFUpload from '@/components/PDFUpload'
 import Header from '@/components/Header'
 
 export default function Home() {
   const [isConfigured, setIsConfigured] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [uploadedFile, setUploadedFile] = useState('')
+  const [chunksCount, setChunksCount] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+
+  // Check for existing PDF when component mounts
+  useEffect(() => {
+    const checkPDFStatus = async () => {
+      try {
+        const response = await fetch('/api/pdf-status')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.has_pdf) {
+            setUploadedFile(data.filename)
+            setChunksCount(data.chunks_count)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking PDF status:', error)
+      }
+    }
+
+    if (isConfigured) {
+      checkPDFStatus()
+    }
+  }, [isConfigured])
+
+  const handleUploadSuccess = (filename: string, chunks: number) => {
+    setUploadedFile(filename)
+    setChunksCount(chunks)
+    setUploadError('')
+  }
+
+  const handleUploadError = (error: string) => {
+    setUploadError(error)
+    setUploadedFile('')
+    setChunksCount(0)
+  }
+
+  const handleConfigured = (key: string) => {
+    setApiKey(key)
+    setIsConfigured(true)
+  }
 
   return (
     <main className="min-h-screen">
       <Header />
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-earth-800 mb-4">
-              AI Chat Assistant
+              AI Chat Assistant with PDF RAG
             </h1>
-            <p className="text-lg text-earth-600 max-w-2xl mx-auto">
-              Experience intelligent conversations with our AI-powered chat interface. 
-              Built with beautiful earth tones and designed for clarity and comfort.
+            <p className="text-lg text-earth-600 max-w-3xl mx-auto">
+              Upload a PDF document and chat with its content using advanced retrieval-augmented generation (RAG). 
+              The AI will answer questions based solely on your uploaded document.
             </p>
           </div>
           
-          <ChatInterface 
-            isConfigured={isConfigured}
-            onConfigured={() => setIsConfigured(true)}
-          />
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* PDF Upload Section */}
+            <div className="space-y-4">
+              {isConfigured && (
+                <>
+                  <PDFUpload
+                    apiKey={apiKey}
+                    onUploadSuccess={handleUploadSuccess}
+                    onUploadError={handleUploadError}
+                    currentFile={uploadedFile}
+                  />
+                  
+                  {uploadError && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="text-red-600">⚠️</div>
+                        <p className="text-red-700">{uploadError}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {uploadedFile && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="text-sm text-blue-700">
+                        <p><strong>Document:</strong> {uploadedFile}</p>
+                        <p><strong>Text chunks processed:</strong> {chunksCount}</p>
+                        <p className="mt-2 italic">
+                          You can now ask questions about the content of this document!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {/* Chat Interface Section */}
+            <div>
+              <ChatInterface 
+                isConfigured={isConfigured}
+                onConfigured={handleConfigured}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </main>

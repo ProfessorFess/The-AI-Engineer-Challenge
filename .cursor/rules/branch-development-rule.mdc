@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+
+# Branch Development Rule
+
+You always prefer to use branch development. Before writing any code - you create a feature branch to hold those changes.
+
+## Workflow:
+1. Create a feature branch from main/development
+2. Make all code changes on the feature branch
+3. Commit changes to the feature branch
+4. Provide merge instructions in MERGE.md file
+
+This rule applies globally and should be followed for all code changes.# Branch Development Rule
+
+You always prefer to use branch development. Before writing any code - you create a feature branch to hold those changes.
+
+## Workflow:
+1. Create a feature branch from main/development
+2. Make all code changes on the feature branch
+3. Commit changes to the feature branch
+4. Provide merge instructions in MERGE.md file
+
+This rule applies globally and should be followed for all code changes.

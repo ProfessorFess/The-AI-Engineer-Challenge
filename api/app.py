@@ -1,5 +1,5 @@
 # Import required FastAPI components for building the API
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
@@ -7,10 +7,22 @@ from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
 import os
-from typing import Optional
+import asyncio
+import tempfile
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+import sys
+
+# Add the parent directory to Python path to import aimakerspace
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Import aimakerspace components for RAG functionality
+from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+from aimakerspace.vectordatabase import VectorDatabase
+from aimakerspace.openai_utils.embedding import EmbeddingModel
 
 # Initialize FastAPI application with a title
-app = FastAPI(title="OpenAI Chat API")
+app = FastAPI(title="OpenAI Chat API with RAG")
 
 # Configure CORS (Cross-Origin Resource Sharing) middleware
 # This allows the API to be accessed from different domains/origins
@@ -22,33 +34,196 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers in requests
 )
 
-# Define the data model for chat requests using Pydantic
+# Custom embedding model that accepts API key dynamically
+class CustomEmbeddingModel:
+    """Custom embedding model that uses provided API key instead of environment variable."""
+    
+    def __init__(self, api_key: str, embeddings_model_name: str = "text-embedding-3-small"):
+        self.api_key = api_key
+        self.embeddings_model_name = embeddings_model_name
+        self.client = OpenAI(api_key=api_key)
+    
+    def get_embedding(self, text: str) -> List[float]:
+        """Return an embedding for a single text."""
+        embedding = self.client.embeddings.create(
+            input=text, model=self.embeddings_model_name
+        )
+        return embedding.data[0].embedding
+    
+    def get_embeddings(self, list_of_text: List[str]) -> List[List[float]]:
+        """Return embeddings for multiple texts."""
+        embedding_response = self.client.embeddings.create(
+            input=list_of_text, model=self.embeddings_model_name
+        )
+        return [item.embedding for item in embedding_response.data]
+    
+    async def async_get_embedding(self, text: str) -> List[float]:
+        """Return an embedding for a single text using async."""
+        # For simplicity, use sync version (could be optimized with AsyncOpenAI)
+        return self.get_embedding(text)
+    
+    async def async_get_embeddings(self, list_of_text: List[str]) -> List[List[float]]:
+        """Return embeddings for multiple texts using async."""
+        # For simplicity, use sync version (could be optimized with AsyncOpenAI)
+        return self.get_embeddings(list_of_text)
+
+# Global RAG components
+vector_db: Optional[VectorDatabase] = None
+pdf_content: str = ""
+uploaded_filename: str = ""
+
+# Define the data models for API requests using Pydantic
 # This ensures incoming request data is properly validated
 class ChatRequest(BaseModel):
     developer_message: str  # Message from the developer/system
     user_message: str      # Message from the user
-    model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
+    model: Optional[str] = "gpt-4o-mini"  # Optional model selection with default
     api_key: str          # OpenAI API key for authentication
 
-# Define the main chat endpoint that handles POST requests
+class PDFUploadResponse(BaseModel):
+    message: str
+    filename: str
+    chunks_processed: int
+
+class PDFStatusResponse(BaseModel):
+    has_pdf: bool
+    filename: str
+    chunks_count: int
+
+# PDF upload endpoint
+@app.post("/api/upload-pdf", response_model=PDFUploadResponse)
+async def upload_pdf(file: UploadFile = File(...), api_key: str = ""):
+    """
+    Upload and process a PDF file for RAG functionality.
+    The PDF will be split into chunks and indexed for semantic search.
+    """
+    global vector_db, pdf_content, uploaded_filename
+    
+    try:
+        # Validate file type
+        if not file.filename or not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Load and process the PDF using aimakerspace
+            pdf_loader = PDFLoader(temp_file_path)
+            pdf_loader.load_file()
+            
+            if not pdf_loader.documents:
+                raise HTTPException(status_code=400, detail="Could not extract text from PDF")
+            
+            pdf_content = pdf_loader.documents[0]
+            uploaded_filename = file.filename
+            
+            # Split the text into chunks
+            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            chunks = text_splitter.split(pdf_content)
+            
+            # Initialize embedding model with the provided API key
+            # We'll create a custom embedding model instance that uses the provided API key
+            embedding_model = CustomEmbeddingModel(api_key=api_key)
+            
+            # Create vector database and build from chunks
+            vector_db = VectorDatabase(embedding_model=embedding_model)
+            vector_db = await vector_db.abuild_from_list(chunks)
+            
+            return PDFUploadResponse(
+                message=f"PDF '{file.filename}' uploaded and processed successfully",
+                filename=file.filename,
+                chunks_processed=len(chunks)
+            )
+            
+        finally:
+            # Clean up temporary file
+            os.unlink(temp_file_path)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+# Check PDF status endpoint
+@app.get("/api/pdf-status", response_model=PDFStatusResponse)
+async def pdf_status():
+    """Check if a PDF has been uploaded and is ready for RAG queries."""
+    global vector_db, uploaded_filename
+    
+    has_pdf = vector_db is not None and uploaded_filename != ""
+    chunks_count = len(vector_db.vectors) if vector_db else 0
+    
+    return PDFStatusResponse(
+        has_pdf=has_pdf,
+        filename=uploaded_filename,
+        chunks_count=chunks_count
+    )
+
+# Enhanced chat endpoint with RAG functionality
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    """
+    Enhanced chat endpoint that uses RAG when a PDF is uploaded.
+    If no PDF is uploaded, falls back to standard chat behavior.
+    """
+    global vector_db, uploaded_filename
+    
     try:
         # Initialize OpenAI client with the provided API key
         client = OpenAI(api_key=request.api_key)
         
-        # Create a non-streaming response first to test
-        response = client.chat.completions.create(
-            model=request.model,
-            messages=[
-                {"role": "system", "content": request.developer_message},
-                {"role": "user", "content": request.user_message}
-            ],
-            stream=False  # Disable streaming for now
-        )
+        # Check if we have a PDF uploaded and vector database ready
+        if vector_db is not None and uploaded_filename:
+            # Use RAG approach: search for relevant context
+            relevant_chunks = vector_db.search_by_text(
+                request.user_message, 
+                k=3,  # Get top 3 most relevant chunks
+                return_as_text=True
+            )
+            
+            # Build context from relevant chunks
+            context = "\n\n".join(relevant_chunks)
+            
+            # Create enhanced system message with context
+            enhanced_system_message = f"""You are an AI assistant that answers questions based solely on the provided context from the uploaded PDF document '{uploaded_filename}'.
+
+IMPORTANT INSTRUCTIONS:
+- Only use information from the provided context to answer questions
+- If the context doesn't contain enough information to answer the question, say "I cannot find that information in the uploaded document"
+- Do not use your general knowledge - stick strictly to the provided context
+- Be accurate and cite specific parts of the context when possible
+
+Context from the document:
+{context}
+
+{request.developer_message}"""
+            
+            # Create chat completion with enhanced context
+            response = client.chat.completions.create(
+                model=request.model,
+                messages=[
+                    {"role": "system", "content": enhanced_system_message},
+                    {"role": "user", "content": request.user_message}
+                ],
+                stream=False
+            )
+            
+            return {"content": response.choices[0].message.content}
         
-        # Return the response content
-        return {"content": response.choices[0].message.content}
+        else:
+            # No PDF uploaded - fall back to standard chat
+            response = client.chat.completions.create(
+                model=request.model,
+                messages=[
+                    {"role": "system", "content": request.developer_message},
+                    {"role": "user", "content": request.user_message}
+                ],
+                stream=False
+            )
+            
+            return {"content": response.choices[0].message.content}
     
     except Exception as e:
         # Handle any errors that occur during processing
@@ -66,5 +241,9 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # For Vercel deployment
-from mangum import Mangum
-handler = Mangum(app)
+try:
+    from mangum import Mangum
+    handler = Mangum(app)
+except ImportError:
+    # mangum not installed - running locally
+    handler = None
