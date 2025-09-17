@@ -121,12 +121,23 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = ""):
             pdf_content = pdf_loader.documents[0]
             uploaded_filename = file.filename
             
+            # Debug: Check if PDF content was extracted
+            if not pdf_content or len(pdf_content.strip()) == 0:
+                raise HTTPException(status_code=400, detail="PDF appears to be empty or contains no extractable text")
+            
             # Split the text into chunks
             text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             chunks = text_splitter.split(pdf_content)
             
+            # Debug: Check if chunks were created
+            if not chunks or len(chunks) == 0:
+                raise HTTPException(status_code=400, detail="Could not create text chunks from PDF content")
+            
+            # Validate API key before proceeding with embeddings
+            if not api_key or len(api_key.strip()) == 0:
+                raise HTTPException(status_code=400, detail="OpenAI API key is required for PDF processing")
+            
             # Initialize embedding model with the provided API key
-            # We'll create a custom embedding model instance that uses the provided API key
             embedding_model = CustomEmbeddingModel(api_key=api_key)
             
             # Create vector database and build from chunks
@@ -175,7 +186,7 @@ async def chat(request: ChatRequest):
         client = OpenAI(api_key=request.api_key)
         
         # Check if we have a PDF uploaded and vector database ready
-        if vector_db is not None and uploaded_filename:
+        if vector_db is not None and uploaded_filename and len(vector_db.vectors) > 0:
             # Use RAG approach: search for relevant context
             relevant_chunks = vector_db.search_by_text(
                 request.user_message, 
@@ -213,21 +224,39 @@ Context from the document:
             return {"content": response.choices[0].message.content}
         
         else:
-            # No PDF uploaded - fall back to standard chat
-            response = client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {"role": "system", "content": request.developer_message},
-                    {"role": "user", "content": request.user_message}
-                ],
-                stream=False
-            )
-            
-            return {"content": response.choices[0].message.content}
+            # No PDF uploaded or empty vector database - fall back to standard chat
+            if uploaded_filename and vector_db is not None:
+                # PDF was uploaded but vector database is empty
+                fallback_message = f"I see you uploaded '{uploaded_filename}', but I cannot answer questions about it because the document processing failed or resulted in no extractable text chunks. Please try uploading the PDF again or use a different PDF with extractable text content."
+                return {"content": fallback_message}
+            else:
+                # No PDF uploaded - standard chat
+                response = client.chat.completions.create(
+                    model=request.model,
+                    messages=[
+                        {"role": "system", "content": request.developer_message},
+                        {"role": "user", "content": request.user_message}
+                    ],
+                    stream=False
+                )
+                
+                return {"content": response.choices[0].message.content}
     
     except Exception as e:
         # Handle any errors that occur during processing
         raise HTTPException(status_code=500, detail=str(e))
+
+# Clear PDF state endpoint for debugging
+@app.post("/api/clear-pdf")
+async def clear_pdf():
+    """Clear the current PDF and vector database state."""
+    global vector_db, pdf_content, uploaded_filename
+    
+    vector_db = None
+    pdf_content = ""
+    uploaded_filename = ""
+    
+    return {"message": "PDF state cleared successfully"}
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
