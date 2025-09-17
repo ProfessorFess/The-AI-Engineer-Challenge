@@ -1,5 +1,5 @@
 # Import required FastAPI components for building the API
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
@@ -92,7 +92,7 @@ class PDFStatusResponse(BaseModel):
 
 # PDF upload endpoint
 @app.post("/api/upload-pdf", response_model=PDFUploadResponse)
-async def upload_pdf(file: UploadFile = File(...), api_key: str = ""):
+async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     """
     Upload and process a PDF file for RAG functionality.
     The PDF will be split into chunks and indexed for semantic search.
