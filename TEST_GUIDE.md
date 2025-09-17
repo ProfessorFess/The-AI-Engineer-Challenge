@@ -18,7 +18,7 @@ This guide explains how to test the new PDF RAG functionality that has been impl
 
 2. **Activate the virtual environment:**
    ```bash
-   source venv/bin/activate
+   source bin/activate
    ```
 
 3. **Install new Python dependencies (if not already installed):**
