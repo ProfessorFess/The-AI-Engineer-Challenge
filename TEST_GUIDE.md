@@ -16,17 +16,29 @@ This guide explains how to test the new PDF RAG functionality that has been impl
    cd api
    ```
 
-2. **Install Python dependencies:**
+2. **Activate the virtual environment:**
    ```bash
-   pip install -r requirements.txt
+   source venv/bin/activate
    ```
 
-3. **Start the backend server:**
+3. **Install new Python dependencies (if not already installed):**
+   ```bash
+   pip install PyPDF2 python-dotenv numpy
+   ```
+
+4. **Start the backend server:**
    ```bash
    python app.py
    ```
    
+   Or alternatively:
+   ```bash
+   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   
    The backend should start on `http://localhost:8000`
+
+**Note:** Make sure to keep the virtual environment activated for all backend operations.
 
 ## Frontend Setup
 
