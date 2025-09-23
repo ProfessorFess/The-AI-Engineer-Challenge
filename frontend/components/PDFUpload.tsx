@@ -38,14 +38,26 @@ export default function PDFUpload({
       formData.append('file', file)
       formData.append('api_key', apiKey)
 
+      console.log('Uploading PDF:', file.name, 'API key length:', apiKey?.length || 0)
+
       const response = await fetch('/api/upload-pdf', {
         method: 'POST',
         body: formData,
       })
 
+      console.log('Upload response status:', response.status, response.statusText)
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Upload failed')
+        let errorMessage = 'Upload failed'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+        } catch (jsonError) {
+          // If JSON parsing fails, the server likely returned HTML (error page)
+          const textError = await response.text()
+          errorMessage = `Server error (${response.status}): ${textError.substring(0, 100)}...`
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
