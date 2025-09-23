@@ -1,6 +1,6 @@
 # AI Chat Frontend
 
-A beautiful, responsive chat interface built with Next.js and styled with earth tones. This frontend connects to the FastAPI backend to provide a seamless AI chat experience.
+A very beautiful, responsive chat interface built with Next.js and styled with earth tones. This frontend connects to the FastAPI backend to provide a seamless AI chat experience.
 
 ## Features
 
