@@ -11,12 +11,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-import sys
 
-# Add the parent directory to Python path to import aimakerspace
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-# Import aimakerspace components for RAG functionality
+# Import aimakerspace components for RAG functionality (local copy for Vercel)
 from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
 from aimakerspace.vectordatabase import VectorDatabase
 from aimakerspace.openai_utils.embedding import EmbeddingModel
