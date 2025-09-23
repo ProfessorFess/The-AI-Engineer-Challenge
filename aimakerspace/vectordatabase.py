@@ -1,47 +1,50 @@
 import asyncio
+import math
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
-
-import numpy as np
 
 from aimakerspace.openai_utils.embedding import EmbeddingModel
 
 
-def cosine_similarity(vector_a: np.ndarray, vector_b: np.ndarray) -> float:
-    """Return the cosine similarity between two vectors."""
-
-    norm_a = np.linalg.norm(vector_a)
-    norm_b = np.linalg.norm(vector_b)
+def cosine_similarity(vector_a: List[float], vector_b: List[float]) -> float:
+    """Return the cosine similarity between two vectors using pure Python."""
+    
+    # Calculate dot product
+    dot_product = sum(a * b for a, b in zip(vector_a, vector_b))
+    
+    # Calculate norms
+    norm_a = math.sqrt(sum(a * a for a in vector_a))
+    norm_b = math.sqrt(sum(b * b for b in vector_b))
+    
     if norm_a == 0 or norm_b == 0:
         return 0.0
-
-    dot_product = np.dot(vector_a, vector_b)
-    return float(dot_product / (norm_a * norm_b))
+    
+    return dot_product / (norm_a * norm_b)
 
 
 class VectorDatabase:
-    """Minimal in-memory vector store backed by numpy arrays."""
+    """Minimal in-memory vector store backed by Python lists."""
 
     def __init__(self, embedding_model: Optional[EmbeddingModel] = None):
-        self.vectors: Dict[str, np.ndarray] = {}
+        self.vectors: Dict[str, List[float]] = {}
         self.embedding_model = embedding_model or EmbeddingModel()
 
     def insert(self, key: str, vector: Iterable[float]) -> None:
         """Store ``vector`` so that it can be retrieved with ``key`` later on."""
 
-        self.vectors[key] = np.asarray(vector, dtype=float)
+        self.vectors[key] = list(vector)
 
     def search(
         self,
         query_vector: Iterable[float],
         k: int,
-        distance_measure: Callable[[np.ndarray, np.ndarray], float] = cosine_similarity,
+        distance_measure: Callable[[List[float], List[float]], float] = cosine_similarity,
     ) -> List[Tuple[str, float]]:
         """Return the ``k`` vectors most similar to ``query_vector``."""
 
         if k <= 0:
             raise ValueError("k must be a positive integer")
 
-        query = np.asarray(query_vector, dtype=float)
+        query = list(query_vector)
         scores = [
             (key, distance_measure(query, vector))
             for key, vector in self.vectors.items()
@@ -53,7 +56,7 @@ class VectorDatabase:
         self,
         query_text: str,
         k: int,
-        distance_measure: Callable[[np.ndarray, np.ndarray], float] = cosine_similarity,
+        distance_measure: Callable[[List[float], List[float]], float] = cosine_similarity,
         return_as_text: bool = False,
     ) -> Union[List[Tuple[str, float]], List[str]]:
         """Vector search using an embedding generated from ``query_text``."""
@@ -64,7 +67,7 @@ class VectorDatabase:
             return [result[0] for result in results]
         return results
 
-    def retrieve_from_key(self, key: str) -> Optional[np.ndarray]:
+    def retrieve_from_key(self, key: str) -> Optional[List[float]]:
         """Return the stored vector for ``key`` if present."""
 
         return self.vectors.get(key)
