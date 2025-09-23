@@ -49,14 +49,22 @@ export default function PDFUpload({
 
       if (!response.ok) {
         let errorMessage = 'Upload failed'
+        
+        // Try to get the response content type to determine how to parse
+        const contentType = response.headers.get('content-type')
+        
         try {
-          const errorData = await response.json()
-          errorMessage = errorData.detail || `HTTP ${response.status}: ${response.statusText}`
-        } catch (jsonError) {
-          // If JSON parsing fails, the server likely returned HTML (error page)
-          const textError = await response.text()
-          errorMessage = `Server error (${response.status}): ${textError.substring(0, 100)}...`
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json()
+            errorMessage = errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+          } else {
+            const textError = await response.text()
+            errorMessage = `Server error (${response.status}): ${textError.substring(0, 100)}...`
+          }
+        } catch (parseError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`
         }
+        
         throw new Error(errorMessage)
       }
 
