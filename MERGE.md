@@ -1,103 +1,53 @@
-# Merge Instructions
+# Merge Instructions: PDF Upload Bug Fix
 
-This document provides instructions for merging feature branch changes back to the main branch using two different approaches.
+## Branch: `fix-pdf-upload-error`
 
-## Prerequisites
+### Summary
+Fixed critical PDF upload functionality that was failing with `FUNCTION_INVOCATION_FAILED` error on Vercel deployment.
 
-- Ensure all changes are committed to your feature branch
-- Make sure your feature branch is up to date with the latest main branch
-- Run any tests to ensure everything is working correctly
+### Problem Identified
+The root cause was an incompatibility between the custom `CustomEmbeddingModel` class and the `VectorDatabase` class:
+- `VectorDatabase.abuild_from_list()` method called `await self.embedding_model.async_get_embeddings()` 
+- The `CustomEmbeddingModel.async_get_embeddings()` was incorrectly implemented as a sync wrapper
+- This caused the serverless function to fail during PDF processing
 
-## Method 1: GitHub Pull Request (Recommended)
+### Changes Made
 
-### Step 1: Push your feature branch
-```bash
-git push origin your-feature-branch-name
-```
+#### 1. Fixed Async Compatibility (`api/app.py`)
+- **Added AsyncOpenAI import**: Imported `AsyncOpenAI` alongside `OpenAI`
+- **Enhanced CustomEmbeddingModel**: 
+  - Added `self.async_client = AsyncOpenAI(api_key=api_key)` initialization
+  - Implemented proper `async_get_embedding()` using `await self.async_client.embeddings.create()`
+  - Implemented proper `async_get_embeddings()` using `await self.async_client.embeddings.create()`
 
-### Step 2: Create a Pull Request
-1. Go to your GitHub repository in a web browser
-2. Click "Compare & pull request" button (should appear after pushing)
-3. Or click "New pull request" and select your feature branch
-4. Fill in the PR title and description
-5. Add any reviewers if needed
-6. Click "Create pull request"
+#### 2. Added File Size Validation
+- Added 4MB file size check before processing (respects Vercel's 4.5MB limit)
+- Fixed duplicate file reading issue
+- Provides clear error message for oversized files (HTTP 413)
 
-### Step 3: Review and Merge
-1. Wait for code review (if required)
-2. Address any feedback or requested changes
-3. Once approved, click "Merge pull request"
-4. Choose merge strategy:
-   - **Create a merge commit**: Preserves branch history
-   - **Squash and merge**: Combines all commits into one
-   - **Rebase and merge**: Replays commits without merge commit
+### Files Modified
+- `api/app.py`: Fixed async embedding methods and added file size validation
 
-### Step 4: Clean up
-```bash
-git checkout main
-git pull origin main
-git branch -d your-feature-branch-name
-git push origin --delete your-feature-branch-name
-```
+### Testing Recommendations
+1. Test PDF upload with small file (< 1MB) to verify basic functionality
+2. Test PDF upload with large file (> 4MB) to verify size limit enforcement
+3. Test RAG chat functionality after successful PDF upload
+4. Verify error handling with invalid file types
 
-## Method 2: GitHub CLI
+### Deployment Notes
+- No dependency changes required (OpenAI 1.35.0 already supports AsyncOpenAI)
+- Changes are backward compatible
+- Function should now work properly in Vercel's serverless environment
 
-### Prerequisites
-Install GitHub CLI if not already installed:
-```bash
-# macOS
-brew install gh
-
-# Or download from: https://cli.github.com/
-```
-
-### Step 1: Authenticate with GitHub
-```bash
-gh auth login
-```
-
-### Step 2: Push your feature branch
-```bash
-git push origin your-feature-branch-name
-```
-
-### Step 3: Create Pull Request via CLI
-```bash
-gh pr create --title "Your PR Title" --body "Description of changes"
-```
-
-### Step 4: Review and Merge
-```bash
-# List open PRs
-gh pr list
-
-# View specific PR details
-gh pr view [PR_NUMBER]
-
-# Merge the PR (replace [PR_NUMBER] with actual number)
-gh pr merge [PR_NUMBER] --merge  # or --squash or --rebase
-```
-
-### Step 5: Clean up
+### Merge Command
 ```bash
 git checkout main
-git pull origin main
-git branch -d your-feature-branch-name
-git push origin --delete your-feature-branch-name
+git merge fix-pdf-upload-error
+git push origin main
 ```
 
-## Merge Strategies Explained
-
-- **Merge commit**: Creates a merge commit, preserving the branch history
-- **Squash and merge**: Combines all commits into a single commit
-- **Rebase and merge**: Replays commits on top of main without a merge commit
-
-Choose the strategy that best fits your project's workflow and history preferences.
-
-## Best Practices
-
-1. **Always test before merging**: Run tests and ensure code quality
-2. **Write descriptive commit messages**: Make it clear what each commit does
-3. **Keep PRs focused**: One feature per PR when possible
-4. **Review your own code**: Check the diff before creating the PR
-5. **Clean up branches**: Delete feature branches after successful merge
+### Post-Merge Verification
+After merging and deploying to Vercel:
+1. Upload a small PDF file to test the functionality
+2. Ask questions about the PDF content to verify RAG is working
+3. Monitor Vercel function logs for any remaining issues
