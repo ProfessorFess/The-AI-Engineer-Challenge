@@ -75,15 +75,24 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error_response(400, "Missing required fields: api_key, user_message")
                 return
             
-            # Import and test OpenAI step by step
+            # Import and test OpenAI client initialization step by step
             try:
                 import openai
-                self._send_json_response({
-                    "debug": "openai imported successfully",
-                    "version": openai.__version__,
-                    "api_key_provided": bool(data.get('api_key'))
-                })
-                return
+                from openai import OpenAI
+                
+                # Test client initialization with minimal args
+                try:
+                    client = OpenAI(api_key=data['api_key'])
+                    self._send_json_response({
+                        "debug": "OpenAI client created successfully",
+                        "version": openai.__version__,
+                        "client_type": str(type(client))
+                    })
+                    return
+                except Exception as client_error:
+                    self._send_error_response(500, f"OpenAI client init failed: {str(client_error)}")
+                    return
+                    
             except ImportError as e:
                 self._send_error_response(500, f"OpenAI import failed: {str(e)}")
                 return
