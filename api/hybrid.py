@@ -75,29 +75,30 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error_response(400, "Missing required fields: api_key, user_message")
                 return
             
-            # Import and test OpenAI client initialization step by step
+            # Import OpenAI using v0.x API (more Vercel-compatible)
             try:
                 import openai
-                from openai import OpenAI
                 
-                # Test client initialization with minimal args
-                try:
-                    client = OpenAI(api_key=data['api_key'])
-                    self._send_json_response({
-                        "debug": "OpenAI client created successfully",
-                        "version": openai.__version__,
-                        "client_type": str(type(client))
-                    })
-                    return
-                except Exception as client_error:
-                    self._send_error_response(500, f"OpenAI client init failed: {str(client_error)}")
-                    return
-                    
-            except ImportError as e:
-                self._send_error_response(500, f"OpenAI import failed: {str(e)}")
+                # Set API key using v0.x style
+                openai.api_key = data['api_key']
+                
+                # Test a simple API call using v0.x style
+                response = openai.ChatCompletion.create(
+                    model=data.get('model', 'gpt-3.5-turbo'),
+                    messages=[
+                        {"role": "system", "content": data.get('developer_message', 'You are a helpful AI assistant.')},
+                        {"role": "user", "content": data['user_message']}
+                    ],
+                    max_tokens=150
+                )
+                
+                self._send_json_response({
+                    "content": response.choices[0].message.content
+                })
                 return
+                    
             except Exception as e:
-                self._send_error_response(500, f"OpenAI debug error: {str(e)}")
+                self._send_error_response(500, f"OpenAI error: {str(e)}")
                 return
             model = data.get('model', 'gpt-4o-mini')
             developer_message = data.get('developer_message', 'You are a helpful AI assistant.')
