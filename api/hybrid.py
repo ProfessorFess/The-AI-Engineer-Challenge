@@ -75,15 +75,21 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error_response(400, "Missing required fields: api_key, user_message")
                 return
             
-            # Import OpenAI inside function to handle import errors
+            # Import and test OpenAI step by step
             try:
-                from openai import OpenAI
-            except ImportError:
-                self._send_error_response(500, "OpenAI library not available")
+                import openai
+                self._send_json_response({
+                    "debug": "openai imported successfully",
+                    "version": openai.__version__,
+                    "api_key_provided": bool(data.get('api_key'))
+                })
                 return
-            
-            # Initialize OpenAI client (minimal configuration for Vercel)
-            client = OpenAI(api_key=data['api_key'])
+            except ImportError as e:
+                self._send_error_response(500, f"OpenAI import failed: {str(e)}")
+                return
+            except Exception as e:
+                self._send_error_response(500, f"OpenAI debug error: {str(e)}")
+                return
             model = data.get('model', 'gpt-4o-mini')
             developer_message = data.get('developer_message', 'You are a helpful AI assistant.')
             user_message = data['user_message']
