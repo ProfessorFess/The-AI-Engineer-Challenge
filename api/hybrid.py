@@ -82,12 +82,8 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error_response(500, "OpenAI library not available")
                 return
             
-            # Initialize OpenAI client with basic configuration
-            client = OpenAI(
-                api_key=data['api_key'],
-                timeout=30.0,
-                max_retries=2
-            )
+            # Initialize OpenAI client (minimal configuration for Vercel)
+            client = OpenAI(api_key=data['api_key'])
             model = data.get('model', 'gpt-4o-mini')
             developer_message = data.get('developer_message', 'You are a helpful AI assistant.')
             user_message = data['user_message']
