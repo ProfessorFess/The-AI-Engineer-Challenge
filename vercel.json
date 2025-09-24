@@ -6,17 +6,14 @@
       "use": "@vercel/next"
     },
     { 
-      "src": "api/app.py", 
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
+      "src": "api/minimal.py", 
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     { 
       "src": "/api/(.*)", 
-      "dest": "api/app.py" 
+      "dest": "api/minimal.py" 
     },
     { 
       "src": "/(.*)", 
