@@ -201,11 +201,109 @@ Context from the document:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             
-            # Parse form data (simplified - real implementation would need more robust parsing)
-            self._send_error_response(501, "PDF upload temporarily disabled - working on multipart parsing")
+            # Parse multipart form data
+            import cgi
+            import io
+            
+            # Create a file-like object from the body
+            body_file = io.BytesIO(body)
+            
+            # Parse the multipart data
+            environ = {
+                'REQUEST_METHOD': 'POST',
+                'CONTENT_TYPE': content_type,
+                'CONTENT_LENGTH': str(content_length)
+            }
+            
+            form = cgi.FieldStorage(
+                fp=body_file,
+                environ=environ,
+                headers={'content-type': content_type}
+            )
+            
+            # Extract file and API key
+            if 'file' not in form:
+                self._send_error_response(400, "No file provided")
+                return
+                
+            if 'api_key' not in form:
+                self._send_error_response(400, "No API key provided")
+                return
+            
+            file_item = form['file']
+            api_key = form['api_key'].value
+            
+            # Validate file
+            if not file_item.filename or not file_item.filename.endswith('.pdf'):
+                self._send_error_response(400, "Only PDF files are allowed")
+                return
+            
+            # Check file size (4MB limit for Vercel)
+            file_content = file_item.file.read()
+            if len(file_content) > 4 * 1024 * 1024:
+                self._send_error_response(413, "File too large. Maximum 4MB allowed.")
+                return
+            
+            # Process PDF
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                temp_file.write(file_content)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Import PyPDF2 inside function to handle import errors gracefully
+                try:
+                    import PyPDF2
+                except ImportError:
+                    self._send_error_response(500, "PDF processing library not available")
+                    return
+                
+                # Extract text from PDF
+                with open(temp_file_path, 'rb') as pdf_file:
+                    reader = PyPDF2.PdfReader(pdf_file)
+                    text = ""
+                    for page in reader.pages:
+                        text += page.extract_text() + "\n"
+                
+                if not text.strip():
+                    self._send_error_response(400, "Could not extract text from PDF")
+                    return
+                
+                # Chunk the text
+                chunks = self._chunk_text(text)
+                
+                if not chunks:
+                    self._send_error_response(400, "No text chunks created from PDF")
+                    return
+                
+                self._send_json_response({
+                    "message": f"PDF '{file_item.filename}' processed successfully",
+                    "filename": file_item.filename,
+                    "chunks_processed": len(chunks),
+                    "chunks": chunks
+                })
+                
+            finally:
+                # Clean up temp file
+                os.unlink(temp_file_path)
             
         except Exception as e:
             self._send_error_response(500, f"PDF upload error: {str(e)}")
+    
+    def _chunk_text(self, text, chunk_size=1000, chunk_overlap=200):
+        """Simple text chunking with overlap."""
+        if len(text) <= chunk_size:
+            return [text]
+        
+        chunks = []
+        step = chunk_size - chunk_overlap
+        
+        for i in range(0, len(text), step):
+            chunk = text[i:i + chunk_size]
+            if chunk.strip():
+                chunks.append(chunk)
+        
+        return chunks
     
     def _simple_similarity_search(self, query, chunks, k=3):
         """Simple text-based similarity search (fallback when no embeddings)"""
