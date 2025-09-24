@@ -12,10 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-# Import aimakerspace components for RAG functionality (local copy for Vercel)
-from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
-from aimakerspace.vectordatabase import VectorDatabase
-from aimakerspace.openai_utils.embedding import EmbeddingModel
+# Note: aimakerspace imports moved inside functions to prevent Vercel startup failures
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API with RAG")
@@ -123,6 +120,9 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
             temp_file_path = temp_file.name
         
         try:
+            # Import aimakerspace components inside function to avoid startup failures
+            from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+            
             # Load and process the PDF using aimakerspace
             pdf_loader = PDFLoader(temp_file_path)
             pdf_loader.load_file()
@@ -190,6 +190,9 @@ async def chat(request: ChatRequest):
         
         # Check if we have PDF chunks for RAG
         if request.pdf_chunks and len(request.pdf_chunks) > 0:
+            # Import VectorDatabase inside function to avoid startup failures
+            from aimakerspace.vectordatabase import VectorDatabase
+            
             # Create vector database on-the-fly for this request
             embedding_model = CustomEmbeddingModel(api_key=request.api_key)
             temp_vector_db = VectorDatabase(embedding_model=embedding_model)
@@ -317,7 +320,7 @@ async def test_imports():
             
         try:
             from aimakerspace.vectordatabase import VectorDatabase
-            results["aimakerspace_vectordatabase"] = "ok"
+            results["aimakerspace_vectordatabase"] = "ok" 
         except Exception as e:
             results["aimakerspace_vectordatabase"] = str(e)
             
