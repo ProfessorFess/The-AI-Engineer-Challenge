@@ -14,10 +14,14 @@ interface Message {
 
 export default function ChatInterface({ 
   isConfigured, 
-  onConfigured 
+  onConfigured,
+  pdfChunks = [],
+  pdfFilename = ''
 }: { 
   isConfigured: boolean
-  onConfigured: (apiKey: string) => void 
+  onConfigured: (apiKey: string) => void
+  pdfChunks?: string[]
+  pdfFilename?: string
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -64,7 +68,9 @@ export default function ChatInterface({
           developer_message: developerMessage,
           user_message: input.trim(),
           model: model,
-          api_key: apiKey
+          api_key: apiKey,
+          pdf_chunks: pdfChunks.length > 0 ? pdfChunks : null,
+          pdf_filename: pdfFilename || null
         })
       })
 
@@ -127,7 +133,14 @@ export default function ChatInterface({
               </div>
               <div>
                 <h2 className="font-semibold text-earth-800">Chat Assistant</h2>
-                <p className="text-sm text-earth-600">Model: {model}</p>
+                <p className="text-sm text-earth-600">
+                  Model: {model}
+                  {pdfChunks.length > 0 && (
+                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                      📄 {pdfFilename ? `PDF: ${pdfFilename}` : 'PDF Loaded'}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
             <button

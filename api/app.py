@@ -68,14 +68,10 @@ class CustomEmbeddingModel:
         )
         return [item.embedding for item in embedding_response.data]
 
-# Global RAG components (Note: These won't persist in Vercel serverless environment)
-vector_db: Optional[VectorDatabase] = None
-pdf_content: str = ""
-uploaded_filename: str = ""
-
-# For Vercel deployment, we'll need to handle stateless nature
+# For Vercel deployment, we need to handle stateless nature
 import json
 from pathlib import Path
+import base64
 
 # Define the data models for API requests using Pydantic
 # This ensures incoming request data is properly validated
@@ -84,25 +80,29 @@ class ChatRequest(BaseModel):
     user_message: str      # Message from the user
     model: Optional[str] = "gpt-4o-mini"  # Optional model selection with default
     api_key: str          # OpenAI API key for authentication
+    pdf_chunks: Optional[List[str]] = None  # Optional PDF chunks for RAG
+    pdf_filename: Optional[str] = None  # Optional PDF filename for context
 
 class PDFUploadResponse(BaseModel):
     message: str
     filename: str
     chunks_processed: int
+    chunks: List[str]  # Return the processed chunks for client-side storage
 
 class PDFStatusResponse(BaseModel):
     has_pdf: bool
     filename: str
     chunks_count: int
+    note: str = "PDF state is not persistent in serverless environment"
 
 # PDF upload endpoint
 @app.post("/api/upload-pdf", response_model=PDFUploadResponse)
 async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     """
     Upload and process a PDF file for RAG functionality.
-    The PDF will be split into chunks and indexed for semantic search.
+    The PDF will be split into chunks and returned for client-side storage.
+    Note: In serverless environment, state is not persistent between requests.
     """
-    global vector_db, pdf_content, uploaded_filename
     
     try:
         # Validate file type
@@ -131,7 +131,6 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
                 raise HTTPException(status_code=400, detail="Could not extract text from PDF")
             
             pdf_content = pdf_loader.documents[0]
-            uploaded_filename = file.filename
             
             # Debug: Check if PDF content was extracted
             if not pdf_content or len(pdf_content.strip()) == 0:
@@ -145,21 +144,16 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
             if not chunks or len(chunks) == 0:
                 raise HTTPException(status_code=400, detail="Could not create text chunks from PDF content")
             
-            # Validate API key before proceeding with embeddings
+            # Validate API key (we don't need to test embeddings here to save time/cost)
             if not api_key or len(api_key.strip()) == 0:
                 raise HTTPException(status_code=400, detail="OpenAI API key is required for PDF processing")
             
-            # Initialize embedding model with the provided API key
-            embedding_model = CustomEmbeddingModel(api_key=api_key)
-            
-            # Create vector database and build from chunks
-            vector_db = VectorDatabase(embedding_model=embedding_model)
-            vector_db = await vector_db.abuild_from_list(chunks)
-            
+            # Return chunks for client-side storage (no server-side persistence in serverless)
             return PDFUploadResponse(
-                message=f"PDF '{file.filename}' uploaded and processed successfully",
+                message=f"PDF '{file.filename}' uploaded and processed successfully. Chunks are ready for RAG queries.",
                 filename=file.filename,
-                chunks_processed=len(chunks)
+                chunks_processed=len(chunks),
+                chunks=chunks
             )
             
         finally:
@@ -172,35 +166,37 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
 # Check PDF status endpoint
 @app.get("/api/pdf-status", response_model=PDFStatusResponse)
 async def pdf_status():
-    """Check if a PDF has been uploaded and is ready for RAG queries."""
-    global vector_db, uploaded_filename
-    
-    has_pdf = vector_db is not None and uploaded_filename != ""
-    chunks_count = len(vector_db.vectors) if vector_db else 0
-    
+    """
+    Check PDF status. Note: In serverless environment, PDF state is not persistent.
+    The client should manage PDF chunks and pass them with chat requests.
+    """
     return PDFStatusResponse(
-        has_pdf=has_pdf,
-        filename=uploaded_filename,
-        chunks_count=chunks_count
+        has_pdf=False,
+        filename="",
+        chunks_count=0,
+        note="PDF state is not persistent in serverless environment. Upload PDF and use chunks in chat requests."
     )
 
 # Enhanced chat endpoint with RAG functionality
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
-    Enhanced chat endpoint that uses RAG when a PDF is uploaded.
-    If no PDF is uploaded, falls back to standard chat behavior.
+    Enhanced chat endpoint that uses RAG when PDF chunks are provided.
+    If no PDF chunks are provided, falls back to standard chat behavior.
     """
-    global vector_db, uploaded_filename
-    
     try:
         # Initialize OpenAI client with the provided API key
         client = OpenAI(api_key=request.api_key)
         
-        # Check if we have a PDF uploaded and vector database ready
-        if vector_db is not None and uploaded_filename and len(vector_db.vectors) > 0:
+        # Check if we have PDF chunks for RAG
+        if request.pdf_chunks and len(request.pdf_chunks) > 0:
+            # Create vector database on-the-fly for this request
+            embedding_model = CustomEmbeddingModel(api_key=request.api_key)
+            temp_vector_db = VectorDatabase(embedding_model=embedding_model)
+            temp_vector_db = await temp_vector_db.abuild_from_list(request.pdf_chunks)
+            
             # Use RAG approach: search for relevant context
-            relevant_chunks = vector_db.search_by_text(
+            relevant_chunks = temp_vector_db.search_by_text(
                 request.user_message, 
                 k=3,  # Get top 3 most relevant chunks
                 return_as_text=True
@@ -210,7 +206,8 @@ async def chat(request: ChatRequest):
             context = "\n\n".join(relevant_chunks)
             
             # Create enhanced system message with context
-            enhanced_system_message = f"""You are an AI assistant that answers questions based solely on the provided context from the uploaded PDF document '{uploaded_filename}'.
+            pdf_name = request.pdf_filename or "the uploaded document"
+            enhanced_system_message = f"""You are an AI assistant that answers questions based solely on the provided context from {pdf_name}.
 
 IMPORTANT INSTRUCTIONS:
 - Only use information from the provided context to answer questions
@@ -236,39 +233,21 @@ Context from the document:
             return {"content": response.choices[0].message.content}
         
         else:
-            # No PDF uploaded or empty vector database - fall back to standard chat
-            if uploaded_filename and vector_db is not None:
-                # PDF was uploaded but vector database is empty
-                fallback_message = f"I see you uploaded '{uploaded_filename}', but I cannot answer questions about it because the document processing failed or resulted in no extractable text chunks. Please try uploading the PDF again or use a different PDF with extractable text content."
-                return {"content": fallback_message}
-            else:
-                # No PDF uploaded - standard chat
-                response = client.chat.completions.create(
-                    model=request.model,
-                    messages=[
-                        {"role": "system", "content": request.developer_message},
-                        {"role": "user", "content": request.user_message}
-                    ],
-                    stream=False
-                )
-                
-                return {"content": response.choices[0].message.content}
+            # No PDF chunks provided - standard chat
+            response = client.chat.completions.create(
+                model=request.model,
+                messages=[
+                    {"role": "system", "content": request.developer_message},
+                    {"role": "user", "content": request.user_message}
+                ],
+                stream=False
+            )
+            
+            return {"content": response.choices[0].message.content}
     
     except Exception as e:
         # Handle any errors that occur during processing
         raise HTTPException(status_code=500, detail=str(e))
-
-# Clear PDF state endpoint for debugging
-@app.post("/api/clear-pdf")
-async def clear_pdf():
-    """Clear the current PDF and vector database state."""
-    global vector_db, pdf_content, uploaded_filename
-    
-    vector_db = None
-    pdf_content = ""
-    uploaded_filename = ""
-    
-    return {"message": "PDF state cleared successfully"}
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
@@ -279,7 +258,8 @@ async def health_check():
     return {
         "status": "ok",
         "environment": "vercel" if is_vercel else "local",
-        "pdf_rag_limitation": "PDF uploads work but don't persist between requests on Vercel" if is_vercel else None
+        "pdf_approach": "stateless - chunks processed per request" if is_vercel else "stateless - chunks processed per request",
+        "note": "PDF chunks are processed on-the-fly for each chat request"
     }
 
 # Entry point for running the application directly

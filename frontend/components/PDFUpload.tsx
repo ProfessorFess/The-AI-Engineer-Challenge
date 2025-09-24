@@ -5,7 +5,7 @@ import { Upload, FileText, X, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface PDFUploadProps {
   apiKey: string
-  onUploadSuccess: (filename: string, chunksCount: number) => void
+  onUploadSuccess: (filename: string, chunksCount: number, chunks: string[]) => void
   onUploadError: (error: string) => void
   currentFile?: string
 }
@@ -69,7 +69,7 @@ export default function PDFUpload({
       }
 
       const result = await response.json()
-      onUploadSuccess(result.filename, result.chunks_processed)
+      onUploadSuccess(result.filename, result.chunks_processed, result.chunks)
     } catch (error) {
       onUploadError(error instanceof Error ? error.message : 'Upload failed')
     } finally {

@@ -12,32 +12,12 @@ export default function Home() {
   const [uploadedFile, setUploadedFile] = useState('')
   const [chunksCount, setChunksCount] = useState(0)
   const [uploadError, setUploadError] = useState('')
+  const [pdfChunks, setPdfChunks] = useState<string[]>([])  // Store PDF chunks
 
-  // Check for existing PDF when component mounts
-  useEffect(() => {
-    const checkPDFStatus = async () => {
-      try {
-        const response = await fetch('/api/pdf-status')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.has_pdf) {
-            setUploadedFile(data.filename)
-            setChunksCount(data.chunks_count)
-          }
-        }
-      } catch (error) {
-        console.error('Error checking PDF status:', error)
-      }
-    }
-
-    if (isConfigured) {
-      checkPDFStatus()
-    }
-  }, [isConfigured])
-
-  const handleUploadSuccess = (filename: string, chunks: number) => {
+  const handleUploadSuccess = (filename: string, chunksProcessed: number, chunks: string[]) => {
     setUploadedFile(filename)
-    setChunksCount(chunks)
+    setChunksCount(chunksProcessed)
+    setPdfChunks(chunks)  // Store the actual PDF chunks
     setUploadError('')
   }
 
@@ -45,6 +25,7 @@ export default function Home() {
     setUploadError(error)
     setUploadedFile('')
     setChunksCount(0)
+    setPdfChunks([])  // Clear PDF chunks on error
   }
 
   const handleConfigured = (key: string) => {
@@ -121,6 +102,8 @@ export default function Home() {
               <ChatInterface 
                 isConfigured={isConfigured}
                 onConfigured={handleConfigured}
+                pdfChunks={pdfChunks}
+                pdfFilename={uploadedFile}
               />
             </div>
           </div>
