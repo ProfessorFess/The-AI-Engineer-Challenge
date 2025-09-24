@@ -1,13 +1,31 @@
-# Ignore local development files
-api/venv/
-api/__pycache__/
-api/aimakerspace/__pycache__/
-*.pyc
-.env
-.DS_Store
-node_modules/
-
-# Ignore local development folders
+# Development and cache files
 **/__pycache__/
 **/.venv/
 **/venv/
+**/.env
+**/.env.local
+**/.env.production
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.vscode/
+.idea/
+
+# Node modules
+**/node_modules/
+
+# Documentation and test files
+docs/
+*.md
+!README.md
+!frontend/README.md
+*.ipynb
+test_*.py
+*_test.py
+
+# Build artifacts
+.next/
+out/
+dist/
+build/

@@ -144,7 +144,11 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
             temp_file_path = temp_file.name
         
         try:
-            import PyPDF2
+            # Import PyPDF2 inside function to handle import errors gracefully
+            try:
+                import PyPDF2
+            except ImportError:
+                raise HTTPException(status_code=500, detail="PDF processing library not available")
             
             # Extract text from PDF
             with open(temp_file_path, 'rb') as pdf_file:
