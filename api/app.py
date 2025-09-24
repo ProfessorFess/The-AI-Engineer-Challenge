@@ -249,9 +249,9 @@ Context from the document:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# For Vercel deployment
-try:
-    from mangum import Mangum
-    handler = Mangum(app)
-except ImportError:
-    handler = None
+# For Vercel deployment - ASGI handler
+from mangum import Mangum
+handler = Mangum(app)
+
+# Also expose app directly for compatibility
+application = app

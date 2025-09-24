@@ -1,0 +1,13 @@
+# Ignore local development files
+api/venv/
+api/__pycache__/
+api/aimakerspace/__pycache__/
+*.pyc
+.env
+.DS_Store
+node_modules/
+
+# Ignore local development folders
+**/__pycache__/
+**/.venv/
+**/venv/
