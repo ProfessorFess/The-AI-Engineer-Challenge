@@ -75,22 +75,58 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error_response(400, "Missing required fields: api_key, user_message")
                 return
             
-            # Import OpenAI using v0.x API (more Vercel-compatible)
+            # Import OpenAI using v0.x API (Vercel-compatible)
             try:
                 import openai
                 
                 # Set API key using v0.x style
                 openai.api_key = data['api_key']
                 
-                # Test a simple API call using v0.x style
-                response = openai.ChatCompletion.create(
-                    model=data.get('model', 'gpt-3.5-turbo'),
-                    messages=[
-                        {"role": "system", "content": data.get('developer_message', 'You are a helpful AI assistant.')},
-                        {"role": "user", "content": data['user_message']}
-                    ],
-                    max_tokens=150
-                )
+                model = data.get('model', 'gpt-3.5-turbo')
+                developer_message = data.get('developer_message', 'You are a helpful AI assistant.')
+                user_message = data['user_message']
+                pdf_chunks = data.get('pdf_chunks')
+                pdf_filename = data.get('pdf_filename')
+                
+                # Check if we have PDF chunks for RAG
+                if pdf_chunks and len(pdf_chunks) > 0:
+                    # Simple similarity search for relevant chunks
+                    relevant_chunks = self._simple_similarity_search(user_message, pdf_chunks, 3)
+                    context = "\n\n".join(relevant_chunks)
+                    
+                    # Enhanced system message with PDF context
+                    pdf_name = pdf_filename or "the uploaded document"
+                    enhanced_system_message = f"""You are an AI assistant that answers questions based on the provided context from {pdf_name}.
+
+IMPORTANT:
+- Only use information from the provided context to answer questions
+- If the context doesn't contain enough information, say "I cannot find that information in the uploaded document"
+- Be accurate and cite specific parts of the context when possible
+
+Context from the document:
+{context}
+
+{developer_message}"""
+                    
+                    # Chat with PDF context
+                    response = openai.ChatCompletion.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": enhanced_system_message},
+                            {"role": "user", "content": user_message}
+                        ],
+                        max_tokens=500
+                    )
+                else:
+                    # Standard chat without PDF
+                    response = openai.ChatCompletion.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": developer_message},
+                            {"role": "user", "content": user_message}
+                        ],
+                        max_tokens=500
+                    )
                 
                 self._send_json_response({
                     "content": response.choices[0].message.content
