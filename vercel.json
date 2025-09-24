@@ -6,14 +6,14 @@
       "use": "@vercel/next" 
     },
     { 
-      "src": "api/simple_test.py", 
-      "use": "@vercel/python" 
+      "src": "api/app_fastapi_minimal.py", 
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     { 
       "src": "/api/(.*)", 
-      "dest": "api/simple_test.py" 
+      "dest": "api/app_fastapi_minimal.py" 
     },
     { 
       "src": "/(.*)", 
