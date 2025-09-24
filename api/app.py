@@ -253,9 +253,11 @@ Context from the document:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# For Vercel deployment - ASGI handler
+# For Vercel deployment - ASGI handler with proper pattern
 from mangum import Mangum
-handler = Mangum(app)
+
+# Create the handler in the pattern Vercel expects
+handler = Mangum(app, lifespan="off")
 
 # Also expose app directly for compatibility
 application = app
