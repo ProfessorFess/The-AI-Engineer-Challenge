@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
 from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 import os
 import asyncio
 import tempfile
@@ -38,6 +38,7 @@ class CustomEmbeddingModel:
         self.api_key = api_key
         self.embeddings_model_name = embeddings_model_name
         self.client = OpenAI(api_key=api_key)
+        self.async_client = AsyncOpenAI(api_key=api_key)
     
     def get_embedding(self, text: str) -> List[float]:
         """Return an embedding for a single text."""
@@ -55,13 +56,17 @@ class CustomEmbeddingModel:
     
     async def async_get_embedding(self, text: str) -> List[float]:
         """Return an embedding for a single text using async."""
-        # For simplicity, use sync version (could be optimized with AsyncOpenAI)
-        return self.get_embedding(text)
+        embedding = await self.async_client.embeddings.create(
+            input=text, model=self.embeddings_model_name
+        )
+        return embedding.data[0].embedding
     
     async def async_get_embeddings(self, list_of_text: List[str]) -> List[List[float]]:
         """Return embeddings for multiple texts using async."""
-        # For simplicity, use sync version (could be optimized with AsyncOpenAI)
-        return self.get_embeddings(list_of_text)
+        embedding_response = await self.async_client.embeddings.create(
+            input=list(list_of_text), model=self.embeddings_model_name
+        )
+        return [item.embedding for item in embedding_response.data]
 
 # Global RAG components (Note: These won't persist in Vercel serverless environment)
 vector_db: Optional[VectorDatabase] = None
