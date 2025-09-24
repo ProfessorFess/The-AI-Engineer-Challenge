@@ -110,9 +110,10 @@ async def search_similar_chunks(query: str, chunks: List[str], api_key: str, k: 
 @app.get("/api/test")
 async def test_endpoint():
     return {
-        "status": "working",
-        "timestamp": "2024-09-24_minimal",
-        "environment": "vercel" if os.getenv("VERCEL") else "local"
+        "status": "working_with_pdf",
+        "timestamp": "2024-09-24_complete",
+        "environment": "vercel" if os.getenv("VERCEL") else "local",
+        "features": ["chat", "pdf_upload", "pdf_rag"]
     }
 
 # Health check
