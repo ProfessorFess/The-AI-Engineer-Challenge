@@ -249,6 +249,88 @@ Context from the document:
         # Handle any errors that occur during processing
         raise HTTPException(status_code=500, detail=str(e))
 
+# Simple test endpoint to verify deployment
+@app.get("/api/test")
+async def test_endpoint():
+    """Simple test endpoint to verify Vercel deployment is working."""
+    import sys
+    import platform
+    return {
+        "status": "deployment_working",
+        "timestamp": "2024-09-24_update",
+        "python_version": platform.python_version(),
+        "environment": "vercel" if os.getenv("VERCEL") else "local"
+    }
+
+# Test upload endpoint to isolate issues
+@app.post("/api/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Simple test upload endpoint to verify file upload works."""
+    try:
+        content = await file.read()
+        return {
+            "status": "upload_test_success",
+            "filename": file.filename,
+            "size": len(content),
+            "content_type": file.content_type
+        }
+    except Exception as e:
+        return {
+            "status": "upload_test_failed",
+            "error": str(e)
+        }
+
+# Test imports endpoint
+@app.get("/api/test-imports")
+async def test_imports():
+    """Test if all required imports work in Vercel environment."""
+    try:
+        results = {}
+        
+        # Test basic imports
+        try:
+            import tempfile
+            results["tempfile"] = "ok"
+        except Exception as e:
+            results["tempfile"] = str(e)
+            
+        # Test PyPDF2
+        try:
+            import PyPDF2
+            results["PyPDF2"] = "ok"
+        except Exception as e:
+            results["PyPDF2"] = str(e)
+            
+        # Test OpenAI
+        try:
+            from openai import OpenAI, AsyncOpenAI
+            results["openai"] = "ok"
+        except Exception as e:
+            results["openai"] = str(e)
+            
+        # Test aimakerspace components
+        try:
+            from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+            results["aimakerspace_text_utils"] = "ok"
+        except Exception as e:
+            results["aimakerspace_text_utils"] = str(e)
+            
+        try:
+            from aimakerspace.vectordatabase import VectorDatabase
+            results["aimakerspace_vectordatabase"] = "ok"
+        except Exception as e:
+            results["aimakerspace_vectordatabase"] = str(e)
+            
+        return {
+            "status": "import_test_complete",
+            "results": results
+        }
+    except Exception as e:
+        return {
+            "status": "import_test_failed",
+            "error": str(e)
+        }
+
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
 async def health_check():
